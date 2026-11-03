@@ -24,29 +24,36 @@ class TaskStatus(Enum):
 
 class TaskOut(BaseModel):
     id: str
-    status: str
-    result: TaskStatus
+    status: TaskStatus
+    result: str | None
     error: str | None
 
 def transcribe(filename: str, task_id: str) -> None:
-    tasks[task_id]["status"] = TaskStatus.RUNNING
+    task: TaskOut = tasks.get(task_id)
 
+    if task is None:
+        return
+    
     try:
+        task.status = TaskStatus.RUNNING
         result = model.transcribe(f"{UPLOAD_DIR}/{filename}")
-        tasks[task_id]["status"] = TaskStatus.COMPLETED
-        tasks[task_id]["result"] = result["text"]
+        task.status = TaskStatus.COMPLETED
+        task.result = result["text"]
     except Exception as e:
-        tasks[task_id]["status"] = TaskStatus.FAILED
-        tasks[task_id]["error"] = str(e)
+        if task is not None:
+            task.status = TaskStatus.FAILED
+            task.error = str(e)
+
+        print(str(e))
 
 @app.post("/transcribe")
 async def upload_file(file: UploadFile, background_task: BackgroundTasks):
     length = file.size
 
     if not length or int(length) > MAX_BYTES:
-        raise HTTPException(413, f"Max size is {MAX_MB} MB")
+        raise HTTPException(400, f"Max size is {MAX_MB} MB")
 
-    new_filename = f"{str(uuid.uuid4())}.{Path(file.filename).suffix}"
+    new_filename = str(uuid.uuid4()) + Path(file.filename).suffix
     target = UPLOAD_DIR / new_filename
 
     if file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -77,19 +84,22 @@ async def upload_file(file: UploadFile, background_task: BackgroundTasks):
 
 @app.get("/transcribe/{task_id}", response_model=TaskOut)
 async def lookup_task(task_id: str):
-    task = tasks[task_id]
+    task = tasks.get(task_id)
 
     if task is None:
-        raise HTTPException(500, f"task '{task_id}' not found")
-    else:
-        return tasks[task_id]
+        raise HTTPException(404, f"task '{task_id}' not found")
+    
+    return task
 
 @app.get("/transcribe/{task_id}/result")
 async def transcription_result(task_id: str):
-    task: TaskOut = tasks[task_id]
+    task: TaskOut = tasks.get(task_id)
 
-    return {
-        "task_id": task.id,
-        "content": task.result,
-        "error": task.error
-    }
+    if task is not None:
+        return {
+            "task_id": task.id,
+            "content": task.result,
+            "error": task.error
+        }
+    else:
+        raise HTTPException(404, f"Task '{task_id}' not found.")
