@@ -19,6 +19,8 @@ RUN groupadd -g 10001 appgroup && \
 
 WORKDIR /microservice
 
+RUN mkdir -p ./temp && chown appuser:appgroup ./temp
+
 COPY --from=builder --chown=appuser:appgroup /microservice/.venv /microservice/.venv
 COPY --chown=appuser:appgroup *.py .
 
