@@ -1,4 +1,6 @@
-FROM python:3.15-alpine AS builder
+FROM python:3.15-slim AS builder
+
+RUN apt-get update
 
 WORKDIR /microservice
 
@@ -8,9 +10,12 @@ RUN python3 -m venv .venv \
     && .venv/bin/pip install --no-cache-dir --upgrade pip \
     && .venv/bin/pip install --no-cache-dir -r requirements.txt
 
-FROM python:3.15-alpine AS runner
+FROM python:3.15-slim AS runner
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apt-get update && apt-get install -y ffmpeg
+
+RUN groupadd -g 10001 appgroup && \
+    useradd -r -u 10001 -g appgroup -m -s /bin/bash appuser
 
 WORKDIR /microservice
 
