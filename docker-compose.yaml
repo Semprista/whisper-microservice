@@ -1,7 +1,11 @@
 services:
   microservice:
-    image: whisper-microservice
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: whisper-microservice
     environment:
       PORT: 8000 # TODO: change to handle env-defined PORT
+    ports:
+      - "8000:8000"
     restart: unless-stopped
