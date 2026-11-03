@@ -1,0 +1,7 @@
+services:
+  microservice:
+    image: whisper-microservice
+    container_name: whisper-microservice
+    environment:
+      PORT: 8000 # TODO: change to handle env-defined PORT
+    restart: unless-stopped
