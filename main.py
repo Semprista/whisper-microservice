@@ -9,11 +9,12 @@ import whisper
 UPLOAD_DIR = Path("temp")
 UPLOAD_DIR.mkdir(exist_ok=True)
 ALLOWED_CONTENT_TYPES = {"video/mp4", "audio/mp3", "audio/aac", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/vnd.wav"}
+TRANSCRIPTION_LANGUAGES = {"en", "fr"}
 MAX_MB = 200
 MAX_BYTES = MAX_MB * 1024 * 1024
 
 app = FastAPI()
-model = whisper.load_model("base") # 1Gb of VRAM
+model = whisper.load_model("base", device="cuda") # 1Gb of VRAM
 tasks = {}
 
 class TaskStatus(Enum):
@@ -28,7 +29,7 @@ class TaskOut(BaseModel):
     result: str | None
     error: str | None
 
-def transcribe(filename: str, task_id: str) -> None:
+def transcribe(filename: str, language: str, task_id: str) -> None:
     task: TaskOut = tasks.get(task_id)
 
     if task is None:
@@ -36,7 +37,7 @@ def transcribe(filename: str, task_id: str) -> None:
     
     try:
         task.status = TaskStatus.RUNNING
-        result = model.transcribe(f"{UPLOAD_DIR}/{filename}")
+        result = model.transcribe(f"{UPLOAD_DIR}/{filename}", language=language)
         task.status = TaskStatus.COMPLETED
         task.result = result["text"]
     except Exception as e:
@@ -47,17 +48,20 @@ def transcribe(filename: str, task_id: str) -> None:
         print(str(e))
 
 @app.post("/transcribe")
-async def upload_file(file: UploadFile, background_task: BackgroundTasks):
+async def upload_file(file: UploadFile, language: str, background_task: BackgroundTasks):
     length = file.size
 
     if not length or int(length) > MAX_BYTES:
         raise HTTPException(400, f"Max size is {MAX_MB} MB")
+    
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(415, "Unsupported file type")
+
+    if language not in TRANSCRIPTION_LANGUAGES:
+        raise HTTPException(400, f"Unknown language ('{language}')")
 
     new_filename = str(uuid.uuid4()) + Path(file.filename).suffix
     target = UPLOAD_DIR / new_filename
-
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(415, "Unsupported file type")
 
     async with aiofiles.open(target, "wb") as out:
         total = 0
@@ -78,7 +82,7 @@ async def upload_file(file: UploadFile, background_task: BackgroundTasks):
 
     tasks[str(task_id)] = new_task
     
-    background_task.add_task(transcribe, new_filename, new_task.id)
+    background_task.add_task(transcribe, new_filename, language, new_task.id)
     
     return {"task_id": task_id}
 
