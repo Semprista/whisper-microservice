@@ -19,4 +19,4 @@ COPY --chown=appuser:appgroup *.py .
 
 USER appuser
 ENV PORT=8000
-CMD [ ".venv/bin/python", "main.py" ]
+CMD [ ".venv/bin/fastapi", "run" ]
