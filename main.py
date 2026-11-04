@@ -1,6 +1,7 @@
 import aiofiles
 from enum import Enum
 from fastapi import BackgroundTasks, FastAPI, UploadFile, HTTPException
+import os
 from pathlib import Path
 from pydantic import BaseModel
 import uuid
@@ -45,7 +46,8 @@ def transcribe(filename: str, language: str, task_id: str) -> None:
             task.status = TaskStatus.FAILED
             task.error = str(e)
 
-        print(str(e))
+    if Path.exists(f"{UPLOAD_DIR}/{filename}"):
+        os.remove(f"{UPLOAD_DIR}/{filename}")
 
 @app.post("/transcribe")
 async def upload_file(file: UploadFile, language: str, background_task: BackgroundTasks):
