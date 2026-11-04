@@ -1,3 +1,3 @@
 # Whisper microservice
 
-Minimal OpenAI's Whisper mirco-service using Fastapi.
+Minimal microservice of the OpenAi's Whisper model using FastAPI.
